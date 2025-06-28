@@ -1,28 +1,23 @@
-
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
+from config import BOT_TOKEN, ADMIN_ID, API_ID, API_HASH
+from database import *
+from conversation import ConversationManager
 import asyncio
 
-from conversation import ConversationManager
 conv = ConversationManager()
-
-# Tambahkan ini:
-from config import BOT_TOKEN, ADMIN_ID, API_ID, API_HASH
-
-from database import *
-# Ubah baris ini:
 bot = Client("bot_session", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 
-# ==== COMMANDS ====
-
+# === /start ===
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message: Message):
-    user_id = message.from_user.id
-    await message.reply_text("👋 Halo! Kirim `/makebot` untuk membuat userbot.\n\n📌 Hanya user terverifikasi yang diizinkan.")
+    await message.reply("👋 Halo! Kirim `/makebot` untuk membuat userbot.\n\n📌 Hanya user yang diizinkan dapat menggunakan fitur ini.")
 
+
+# === /allowuser (admin only) ===
 @bot.on_message(filters.command("allowuser") & filters.user(ADMIN_ID))
 async def allow_user_cmd(_, message: Message):
     if len(message.command) < 2:
@@ -32,47 +27,80 @@ async def allow_user_cmd(_, message: Message):
         add_user(user_id)
         await message.reply(f"✅ User `{user_id}` diizinkan membuat userbot.")
     except:
-        await message.reply("❌ Gagal menambahkan.")
+        await message.reply("❌ Gagal menambahkan user.")
 
+
+# === /makebot ===
 @bot.on_message(filters.command("makebot") & filters.private)
-async def make_bot(client, message: Message):
+async def makebot(client, message: Message):
     user_id = message.from_user.id
+
     if not is_user_allowed(user_id):
         return await message.reply("🚫 Kamu tidak diizinkan membuat userbot.")
 
+    conv.start(user_id, "awaiting_api_id")
     await message.reply("Masukkan API ID kamu:")
-    api_id_msg = await bot.listen(user_id)
-    API_ID_TEMP[user_id] = int(api_id_msg.text)
-
-    await message.reply("Masukkan API HASH kamu:")
-    api_hash_msg = await bot.listen(user_id)
-    API_HASH_TEMP[user_id] = api_hash_msg.text
-
-    await message.reply("Masukkan nomor telepon akun kamu (dalam format internasional, contoh: `+628xxxxxxxxx`):")
-    phone_msg = await bot.listen(user_id)
-    phone = phone_msg.text
-
-    await message.reply("📲 Mengirim kode OTP ke akun kamu...")
-    try:
-        client_telethon = TelegramClient(StringSession(), API_ID_TEMP[user_id], API_HASH_TEMP[user_id])
-        await client_telethon.connect()
-        code_sent = await client_telethon.send_code_request(phone)
-
-        await message.reply("Masukkan kode OTP (tanpa spasi):")
-        otp_msg = await bot.listen(user_id)
-        otp_code = otp_msg.text.strip()
-
-        await client_telethon.sign_in(phone, otp_code)
-        session_str = client_telethon.session.save()
-
-        save_session(user_id, session_str)
-        await message.reply("✅ Userbot berhasil dibuat!\n\nGunakan `.menu` di akun kamu.")
-        await client_telethon.disconnect()
-
-    except Exception as e:
-        await message.reply(f"❌ Gagal login: {e}")
 
 
+# === Global handler untuk percakapan ===
+@bot.on_message(filters.private & filters.text)
+async def handle_inputs(client, message: Message):
+    user_id = message.from_user.id
+    state = conv.get_state(user_id)
+
+    if not state:
+        return
+
+    if state == "awaiting_api_id":
+        try:
+            conv.set_data(user_id, "api_id", int(message.text))
+            conv.set_state(user_id, "awaiting_api_hash")
+            await message.reply("Masukkan API HASH kamu:")
+        except:
+            await message.reply("❌ API ID tidak valid. Masukkan angka.")
+
+    elif state == "awaiting_api_hash":
+        conv.set_data(user_id, "api_hash", message.text.strip())
+        conv.set_state(user_id, "awaiting_phone")
+        await message.reply("Masukkan nomor HP kamu (contoh: +62xxxx):")
+
+    elif state == "awaiting_phone":
+        phone = message.text.strip()
+        conv.set_data(user_id, "phone", phone)
+        await message.reply("📲 Mengirim kode OTP...")
+
+        try:
+            data = conv.get_data(user_id)
+            client_telethon = TelegramClient(StringSession(), data["api_id"], data["api_hash"])
+            await client_telethon.connect()
+            await client_telethon.send_code_request(phone)
+
+            conv.set_data(user_id, "client", client_telethon)
+            conv.set_state(user_id, "awaiting_otp")
+            await message.reply("Masukkan kode OTP:")
+        except Exception as e:
+            await message.reply(f"❌ Gagal kirim kode: {e}")
+            conv.end(user_id)
+
+    elif state == "awaiting_otp":
+        otp = message.text.strip()
+        data = conv.get_data(user_id)
+        client_telethon = data.get("client")
+        phone = data.get("phone")
+
+        try:
+            await client_telethon.sign_in(phone, otp)
+            session_str = client_telethon.session.save()
+            save_session(user_id, session_str)
+            await client_telethon.disconnect()
+            await message.reply("✅ Userbot berhasil dibuat!")
+        except Exception as e:
+            await message.reply(f"❌ Gagal login: {e}")
+        finally:
+            conv.end(user_id)
+
+
+# === /status ===
 @bot.on_message(filters.command("status") & filters.private)
 async def status(_, message: Message):
     user_id = message.from_user.id
@@ -81,6 +109,8 @@ async def status(_, message: Message):
     else:
         await message.reply("🚫 Kamu belum membuat userbot.")
 
+
+# === /stopbot ===
 @bot.on_message(filters.command("stopbot") & filters.private)
 async def stopbot(_, message: Message):
     user_id = message.from_user.id
@@ -90,6 +120,8 @@ async def stopbot(_, message: Message):
     else:
         await message.reply("⚠️ Tidak ada session ditemukan.")
 
+
+# === /sudolist ===
 @bot.on_message(filters.command("sudolist") & filters.user(ADMIN_ID))
 async def sudolist(_, message: Message):
     sudo_users = get_sudo_list()
@@ -98,6 +130,6 @@ async def sudolist(_, message: Message):
     await message.reply(text)
 
 
-# === Run Bot ===
+# === RUN BOT ===
 print("🤖 Bot pusat aktif.")
 bot.run()
