@@ -4,15 +4,11 @@ from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 import asyncio
 
-from config import BOT_TOKEN, ADMIN_ID
-from database import *
+# Tambahkan ini:
+from config import BOT_TOKEN, ADMIN_ID, API_ID, API_HASH
 
-import os
-
-API_ID_TEMP = {}
-API_HASH_TEMP = {}
-
-bot = Client("bot_session", bot_token=BOT_TOKEN)
+# Ubah baris ini:
+bot = Client("bot_session", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 
 # ==== COMMANDS ====
