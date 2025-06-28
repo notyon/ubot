@@ -52,6 +52,7 @@ async def handle_inputs(client, message: Message):
     if not state:
         return
 
+    # === STEP 1: API ID ===
     if state == "awaiting_api_id":
         try:
             conv.set_data(user_id, "api_id", int(message.text))
@@ -60,11 +61,13 @@ async def handle_inputs(client, message: Message):
         except:
             await message.reply("❌ API ID tidak valid. Masukkan angka.")
 
+    # === STEP 2: API HASH ===
     elif state == "awaiting_api_hash":
         conv.set_data(user_id, "api_hash", message.text.strip())
         conv.set_state(user_id, "awaiting_phone")
         await message.reply("Masukkan nomor HP kamu (contoh: +62xxxx):")
 
+    # === STEP 3: PHONE ===
     elif state == "awaiting_phone":
         phone = message.text.strip()
         conv.set_data(user_id, "phone", phone)
@@ -83,6 +86,7 @@ async def handle_inputs(client, message: Message):
             await message.reply(f"❌ Gagal kirim kode: {e}")
             conv.end(user_id)
 
+    # === STEP 4: OTP ===
     elif state == "awaiting_otp":
         otp = message.text.strip()
         data = conv.get_data(user_id)
@@ -91,31 +95,37 @@ async def handle_inputs(client, message: Message):
 
         try:
             await client_telethon.sign_in(phone, otp)
+            session_str = client_telethon.session.save()
+            save_session(user_id, session_str)
+            await client_telethon.disconnect()
+            await message.reply("✅ Userbot berhasil dibuat!")
+            conv.end(user_id)
         except SessionPasswordNeededError:
+            conv.set_state(user_id, "awaiting_password")
             await message.reply("🔐 Akun ini menggunakan verifikasi dua langkah.\nMasukkan password kamu:")
 
-            password_msg = await bot.listen(user_id)
-            password = password_msg.text.strip()
-
-            try:
-                await client_telethon.sign_in(password=password)
-            except Exception as e:
-                await message.reply(f"❌ Gagal login dengan password: {e}")
-                await client_telethon.disconnect()
-                conv.end(user_id)
-                return
         except Exception as e:
             await message.reply(f"❌ Gagal login: {e}")
             await client_telethon.disconnect()
             conv.end(user_id)
-            return
 
-        # Jika berhasil login
-        session_str = client_telethon.session.save()
-        save_session(user_id, session_str)
-        await client_telethon.disconnect()
-        await message.reply("✅ Userbot berhasil dibuat!")
-        conv.end(user_id)
+    # === STEP 5: PASSWORD ===
+    elif state == "awaiting_password":
+        password = message.text.strip()
+        data = conv.get_data(user_id)
+        client_telethon = data.get("client")
+
+        try:
+            await client_telethon.sign_in(password=password)
+            session_str = client_telethon.session.save()
+            save_session(user_id, session_str)
+            await client_telethon.disconnect()
+            await message.reply("✅ Userbot berhasil dibuat!")
+        except Exception as e:
+            await message.reply(f"❌ Gagal login dengan password: {e}")
+            await client_telethon.disconnect()
+        finally:
+            conv.end(user_id)
 
 
 # === /status ===
