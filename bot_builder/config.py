@@ -1,22 +1,22 @@
-
 import os
 from dotenv import load_dotenv
 
-# Load variabel dari .env file
+# Load .env file
 load_dotenv()
 
-# Telegram Bot Token dari @BotFather
-BOT_TOKEN = os.getenv("8068737897:AAEC4EfVnn-GeN7Yo0oMRpxcY0_eYCjHVLo")
+# Helper untuk validasi
+def ensure_env(var_name, cast=str):
+    value = os.getenv(var_name)
+    if value is None or value.strip() == "":
+        raise ValueError(f"❌ ENV variable '{var_name}' is missing or empty.")
+    try:
+        return cast(value)
+    except Exception:
+        raise ValueError(f"❌ ENV variable '{var_name}' is not valid {cast.__name__}.")
 
-# ID Admin bot pusat (int)
-ADMIN_ID = int(os.getenv("1684865940"))
-
-# MongoDB URI
-MONGO_URI = os.getenv("mongodb+srv://ucik:ucik@cluster0.0l3r8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-
-# API_ID & API_HASH wajib untuk autentikasi Pyrogram
-API_ID = int(os.getenv("29486311"))
-API_HASH = os.getenv("ffdc688dc4eee8d2585cb24155188432")
-FORCE_JOIN_CHANNEL = os.getenv("FORCE_JOIN_CHANNEL", "1001991260453")
-FORCE_JOIN_NAME = os.getenv("FORCE_JOIN_NAME", "leobaseid")  # Misalnya: 'leobaseid'
-GCAST_BLACKLIST = os.getenv("GCAST_BLACKLIST", "").split("|")  # pisahkan pakai '|'# Configuration for bot_builder
+# Ambil variabel dengan validasi
+BOT_TOKEN = ensure_env("BOT_TOKEN")
+ADMIN_ID = ensure_env("ADMIN_ID", int)
+MONGO_URI = ensure_env("MONGO_URI")
+API_ID = ensure_env("API_ID", int)
+API_HASH = ensure_env("API_HASH")
