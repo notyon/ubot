@@ -2,9 +2,12 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
+from telethon.errors import SessionPasswordNeededError
+
 from config import BOT_TOKEN, ADMIN_ID, API_ID, API_HASH
 from database import *
 from conversation import ConversationManager
+
 import asyncio
 
 conv = ConversationManager()
@@ -14,7 +17,9 @@ bot = Client("bot_session", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKE
 # === /start ===
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message: Message):
-    await message.reply("👋 Halo! Kirim `/makebot` untuk membuat userbot.\n\n📌 Hanya user yang diizinkan dapat menggunakan fitur ini.")
+    await message.reply(
+        "👋 Halo! Kirim `/makebot` untuk membuat userbot.\n\n📌 Hanya user yang diizinkan dapat menggunakan fitur ini."
+    )
 
 
 # === /allowuser (admin only) ===
@@ -62,12 +67,12 @@ async def handle_inputs(client, message: Message):
     elif state == "awaiting_api_hash":
         conv.set_data(user_id, "api_hash", message.text.strip())
         conv.set_state(user_id, "awaiting_phone")
-        await message.reply("Masukkan nomor HP kamu (contoh: +62xxxx):")
+        await message.reply("Masukkan nomor HP kamu (contoh: +62xxxxxxxxxx):")
 
     elif state == "awaiting_phone":
         phone = message.text.strip()
         conv.set_data(user_id, "phone", phone)
-        await message.reply("📲 Mengirim kode OTP...")
+        await message.reply("📲 Mengirim kode OTP ke akun kamu...")
 
         try:
             data = conv.get_data(user_id)
@@ -77,7 +82,7 @@ async def handle_inputs(client, message: Message):
 
             conv.set_data(user_id, "client", client_telethon)
             conv.set_state(user_id, "awaiting_otp")
-            await message.reply("Masukkan kode OTP:")
+            await message.reply("Masukkan kode OTP yang kamu terima:")
         except Exception as e:
             await message.reply(f"❌ Gagal kirim kode: {e}")
             conv.end(user_id)
@@ -90,14 +95,31 @@ async def handle_inputs(client, message: Message):
 
         try:
             await client_telethon.sign_in(phone, otp)
-            session_str = client_telethon.session.save()
-            save_session(user_id, session_str)
-            await client_telethon.disconnect()
-            await message.reply("✅ Userbot berhasil dibuat!")
+        except SessionPasswordNeededError:
+            await message.reply("🔐 Akun ini menggunakan verifikasi dua langkah (password).\nMasukkan password kamu:")
+
+            password_msg = await bot.listen(user_id)
+            password = password_msg.text.strip()
+
+            try:
+                await client_telethon.sign_in(password=password)
+            except Exception as e:
+                await message.reply(f"❌ Gagal login dengan password: {e}")
+                await client_telethon.disconnect()
+                conv.end(user_id)
+                return
         except Exception as e:
             await message.reply(f"❌ Gagal login: {e}")
-        finally:
+            await client_telethon.disconnect()
             conv.end(user_id)
+            return
+
+        # Jika berhasil login
+        session_str = client_telethon.session.save()
+        save_session(user_id, session_str)
+        await client_telethon.disconnect()
+        await message.reply("✅ Userbot berhasil dibuat dan disimpan!\nSilakan jalankan userbot kamu.")
+        conv.end(user_id)
 
 
 # === /status ===
