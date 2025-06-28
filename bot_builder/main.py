@@ -5,6 +5,9 @@ from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 import asyncio
 
+from conversation import ConversationManager
+conv = ConversationManager()
+
 # Tambahkan ini:
 from config import BOT_TOKEN, ADMIN_ID, API_ID, API_HASH
 
