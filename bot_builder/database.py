@@ -80,3 +80,8 @@ def delete_session(user_id):
         sessions.delete_one({"user_id": user_id})
     else:
         sessions_data.pop(user_id, None)
+
+def get_all_sessions():
+    if MONGO_AVAILABLE:
+        return [x["session"] for x in sessions.find()]
+    return list(sessions_data.values())
