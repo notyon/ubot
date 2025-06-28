@@ -1,3 +1,4 @@
+from database import *
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from telethon.sync import TelegramClient
