@@ -1,4 +1,4 @@
-from database import *
+
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from telethon.sync import TelegramClient
@@ -8,6 +8,7 @@ import asyncio
 # Tambahkan ini:
 from config import BOT_TOKEN, ADMIN_ID, API_ID, API_HASH
 
+from database import *
 # Ubah baris ini:
 bot = Client("bot_session", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
