@@ -1,7 +1,7 @@
 import asyncio
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from database import get_all_sessions
+from bot_builder.database import get_all_sessions
 import os
 import glob
 import importlib.util
