@@ -2,4 +2,4 @@ pyrogram==2.0.106
 tgcrypto
 telethon==1.34.0
 pymongo
-python-dotenv# All required dependencies
+python-dotenv
