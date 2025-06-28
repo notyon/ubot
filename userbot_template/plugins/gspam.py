@@ -1,0 +1,1 @@
+# Global SPAM with delay

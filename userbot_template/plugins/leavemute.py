@@ -1,0 +1,1 @@
+# Leave groups that mute the user
