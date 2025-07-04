@@ -21,7 +21,7 @@ def load_plugins(client):
 
 async def start_userbot(session_string):
     try:
-        from config import API_ID, API_HASH
+        from bot_builder.config import API_ID, API_HASH
         client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
         await client.start()
         load_plugins(client)
